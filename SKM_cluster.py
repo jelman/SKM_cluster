@@ -6,6 +6,7 @@ import rpy2
 import random
 sparcl = rpy2.robjects.packages.importr("sparcl")
 
+
 def prepare_data(infile, visit='last'):
     """
     Takes input spreadsheet and loads into pd DataFrame. Assumes first 
@@ -36,12 +37,14 @@ def prepare_data(infile, visit='last'):
         cleandata = singlevisit.set_index(subj_col)      
     return cleandata
 
-def create_tots_frame(dataframe):  
-    """ Create empty dataframe to hold results of feature weights and cluster 
-    membership from resampling""" 
-    weight_tots = pd.DataFrame(data=None, columns = dataframe.columns)
-    clust_tots = pd.DataFrame(data=None, columns = dataframe.index)
-    return weight_tots, clust_tots
+
+def create_rslts_frame(dataframe):  
+    """ Create empty dataframe to hold eature weights and cluster 
+    membership results of each resampling run""" 
+    weight_rslts = pd.DataFrame(data=None, index = dataframe.columns)
+    clust_rslts = pd.DataFrame(data=None, index = dataframe.index)
+    return weight_rslts, clust_rslts
+    
     
 def sample_data(data):
     """
@@ -51,39 +54,79 @@ def sample_data(data):
     samp_n = int(.70 * len(data))
     rand_samp = sorted(random.sample(xrange(len(data)), samp_n))
     sampdata = data.take(rand_samp)
-#    unsamp_idx = [x for x in xrange(len(data)) if x not in rand_samp]
-#    unsamp = data[unsampidx]
     return sampdata
 
-def skm_cluster(data):
+
+def skm_permute(data):
     """
-    Runs sparse k-means clustering on an nxp data matrix where n is the 
-    number of observations, and p is the number of features. First, runs
-    a permutation to determine the best wbound - the L1 bound on the feature 
-    weights (lower value results in sparse.  
+    rpy2 wrapper for R function: KMeansSparseCluster.permute from the sparcl package.
+    The tuning parameter controls the L1 bound on w, the feature weights. A permutation 
+    approach is used to select the tuning parameter. 
+    
+    Infile:
+    ---------------
+    data: nxp dataframe where n is observations and p is features (i.e. ROIs)
+            Should be a pandas DataFrame with subject codes as index and only
+            features to be used in clustering as columns.
     
     Returns:
-    km_weights: dictionary 
-                keys = feature labels, values = weights
-    km_clusters: dictionary
-                keys = subject id, values = cluster membership
+    ---------------
+    bestw: tuning parameter that returns the highest gap statistic
+    
+    lowestw: smallest tuning parameter that gives a gap statistic within 
+                one sdgap of the largest gap statistic
     """
+    r_data = com.convert_to_r_dataframe(data, L1bound)
+    km_perm = sparcl.KMeansSparseCluster_permute(r_data,K=2,nperms=25)
+    bestw = km_perm.rx2('bestw')[0]
+    wbounds = km_perm.rx2('wbounds')
+    gaps = km_perm.rx2('gaps')
+    bestgap = max(gaps)
+    sdgaps = km_perm.rx2('sdgaps')
+    # Calculate smallest wbound that returns gap stat within one sdgap of best wbound
+    wbound_rnge = [wbounds[i] for i in range(len(gaps)) if (gaps[i]+sdgaps[i]>=bestgap)]
+    lowestw = min(wbound_rnge)
+    return bestw, lowestw
     
-    # Run permutation on subset in order to generate best wbound
-    km_perm = sparcl.KMeansSparseCluster_permute(data,K=2,nperms=25)
-    bestw = km_perm.rx2('bestw')
     
-    # Cluster observations using best wbound
-    km_out = sparcl.KMeansSparseCluster(data,K=2, wbounds=bestw)
+def skm_cluster(data, L1bound):
+    """
+    rpy2 wrapper for R function: KMeansSparseCluster from the sparcl package.
+    This function performs sparse k-means clustering. You must specify L1 bound on w, 
+    the feature weights. 
     
+    Note: A smaller L1 bound will results in sparser weighting. If a large number of 
+    features are included, it may be useful to use the smaller tuning parameter 
+    returned by KMeansSparseCluster.permute wrapper function.
+    
+    Infile:
+    ---------------
+    data: nxp dataframe where n is observations and p is features (i.e. ROIs)
+            Should be a pandas DataFrame with subject codes as index and only
+            features to be used in clustering as columns.
+    
+    Returns:
+    ---------------
+    km_weights: pandas DataFrame   
+                index = feature labels, values = weights
+    km_clusters: pandas DataFrame
+                index = subject code, values = cluster membership
+    """
+    # Convert pandas dataframe to R dataframe
+    r_data = com.convert_to_r_dataframe(data)
+    # Cluster observations using specified L1 bound
+    km_out = sparcl.KMeansSparseCluster(r_data,K=2, wbounds=L1bound)
     # Create dictionary of feature weights, normalized feature weights and
     # cluster membership
     ws = km_out.rx2(1).rx2('ws')
-    km_weights = {k: ws.rx2(k)[0] for k in ws.names}
-    weightsum = np.sum(km_weights.values())
-    km_weightsnorm = {k: km_weights[k] / weightsum for k in km_weights.viewkeys()}
+    km_weights = {k: [ws.rx2(k)[0]] for k in ws.names}
+    km_weights = pd.DataFrame.from_dict(km_weights)
+    km_weightsT = km_weights.T
+    km_weightsnorm = km_weightsT/km_weightsT.sum()
     Cs = km_out.rx2(1).rx2('Cs')
-    km_clusters = {k: Cs.rx2(k)[0] for k in Cs.names}   
+    km_clusters = {k: [Cs.rx2(k)[0]] for k in Cs.names}   
+    km_clusters = pd.DataFrame.from_dict(km_clusters)
+    km_clusters = km_clusters.T
     return km_weightsnorm, km_clusters
         
         
@@ -111,26 +154,32 @@ def clust_centers(data, clust_num):
     
 
 def main(infile, outdir, visit):
+    # Select one visit, clean subj codes
     dataframe = prepare_data(infile, visit) 
-    weight_tots, clust_tots = create_tots_frame(dataframe)
-
+    # Create empty frames to hold results of 
+    weight_rslts, clust_rslts = create_rslts_frame(dataframe) 
+    for resamp_run in range(10):
+        # Get random sub-sample (without replacement) of group to feed into clustering
+        # Currently set to 70% of group N
+        sampdat = subsample_data(dataframe)
+        bestw, lowestw = skm_permute(sampdat)
+        km_wghtnorm, km_clust = skm_cluster(sampdat, lowestw)      
+        clust1_means, clust2_means = clust_centers(sampdat, km_clust)
+        
         
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description = 'Sparse K-means Clustering with re-sampling to cluster subjects into PIB+ and PIB- groups.',
+    parser = argparse.ArgumentParser(description = """Sparse K-means Clustering with re-sampling to cluster subjects into PIB+ and PIB- groups.""",
                                     formatter_class=argparse.RawTextHelpFormatter,
-                                    epilog= """ Format of infile should be a spreadsheet with first column containing subject ID's and the remaining columns corresponding to ROIs to be used as features in clustering. The first row may contain headers.
-            """)
+                                    epilog= """Format of infile should be a spreadsheet with first column containing subject ID's and the remaining columns corresponding to ROIs to be used as features in clustering. The first row may contain headers.""")
 
     parser.add_argument('infile', type=str, nargs=1,
                         help="""Input file containing subject codes and PIB indices""")
     parser.add_argument('-outdir', dest='outdir', default=None,
-                        help="""Directory to save results.
-    default = infile directory""")
+                        help="""Directory to save results. \ndefault = infile directory""")
     parser.add_argument('-visit', type=str, dest='visit', default=None,
                         choices=['first', 'last'],
-                        help="""Specify which visit to use if multiple visits exist
-    default = last""")
+                        help="""Specify which visit to use if multiple visits exist \ndefault = last""")
     
     if len(sys.argv) == 1:
         parser.print_help()
@@ -143,9 +192,6 @@ if __name__ == '__main__':
             
         ### Begin running SKM clustering and resampling  
         main(args.infile, args.outdir, args.visit)
-            
-
-    
 
 
     # Load input spreadsheet into dataframe and select visit if multiple exist
