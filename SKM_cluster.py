@@ -54,7 +54,9 @@ def sample_data(data):
     samp_n = int(.70 * len(data))
     rand_samp = sorted(random.sample(xrange(len(data)), samp_n))
     sampdata = data.take(rand_samp)
-    return sampdata
+    unsamp_idx = [x for x in xrange(len(data)) if x not in rand_samp]
+    unsampdata = data.take(unsamp_idx)
+    return sampdata, unsampdata
 
 
 def skm_permute(data):
@@ -76,7 +78,7 @@ def skm_permute(data):
     lowestw: smallest tuning parameter that gives a gap statistic within 
                 one sdgap of the largest gap statistic
     """
-    r_data = com.convert_to_r_dataframe(data, L1bound)
+    r_data = com.convert_to_r_dataframe(data)
     km_perm = sparcl.KMeansSparseCluster_permute(r_data,K=2,nperms=25)
     bestw = km_perm.rx2('bestw')[0]
     wbounds = km_perm.rx2('wbounds')
@@ -119,7 +121,7 @@ def skm_cluster(data, L1bound):
     # Create dictionary of feature weights, normalized feature weights and
     # cluster membership
     ws = km_out.rx2(1).rx2('ws')
-    km_weights = {k: [ws.rx2(k)[0]] for k in ws.names}
+    km_weights = {k.replace('.','-'): [ws.rx2(k)[0]] for k in ws.names}
     km_weights = pd.DataFrame.from_dict(km_weights)
     km_weightsT = km_weights.T
     km_weightsnorm = km_weightsT/km_weightsT.sum()
@@ -130,28 +132,90 @@ def skm_cluster(data, L1bound):
     return km_weightsnorm, km_clusters
         
         
-def clust_centers(data, clust_num):
+def calc_cutoffs(data, weights, clusters):
     """
-    Determines the cluster centers given an array of data and cluster membership.
+    EDIT DOC STRING
+    Determines the features with the top 50% weights used in clustering and determines 
+    the cluster centers for these regions. Clusters are then labelled as positive or
+    negative based on which has the highest average PIB index across these features. 
+    This is done because clustering does not consistently assign the same label to groups
+    across runs. 
     
     Inputs
     ----------
-    data: an nxp array with n observations and p features
-    clust_num: dict {subject id: cluster number}
+    data:   nxp dataframe where n is observations and p is features (i.e. ROIs)
+            Should be a pandas DataFrame with subject codes as index and only
+            features to be used in clustering as columns.
+            
+    weights:    pandas DataFrame   
+                index = feature labels, values = weights
+    clusters:   pandas DataFrame
+                index = subject code, values = cluster membership
     
     Returns:
     ----------
-    clust1_means: array listing the feature label and mean across cluster 1 members
-    clust2_means: array listing the feature label and mean across cluster 2 members
-    """
-    clust1_idx = [clust_num[key]==1 for key in clust_num.keys()]
-    clust1_means = data[clust1_idx].mean(axis=0)
-    clust2_idx = [clust_num[key]==2 for key in clust_num.keys()]
-    clust2_means = data[clust2_idx].mean(axis=0)
-    return clust1_means, clust2_means
-
-
+    clust_renamed:  pandas DataFrame
+                    renamed version of clusters input such that integer labels
+                    are replaced with appropriate string label ('pos' or 'neg')
     
+    cutoffs:    pandas Dataframe
+                index = features labels accounting for to 50% of weights
+                values = cut-off score determined as mid-point of cluster means
+                        for each feature
+    
+    Note:
+    The cluster means may be used to create cut-off scores (i.e. the midpoint between
+    cluster means) in order to predict cluster membership of other subjects. The index
+    of topfeats may be used to constrain which regions are used as they provide the
+    most meaningful values regarding PIB status.
+    """
+    # Select features accounting for up to 50% of the weighting
+    sorted_weights = weights.sort(columns=0, ascending=False)
+    sum_weights = sorted_weights.cumsum()
+    topfeats = sum_weights[sum_weights[0] <= .50].index
+    clust1subs = clusters[clusters[0] == 1].index
+    clust2subs = clusters[clusters[0] == 2].index
+    clust1dat = sampdat.reindex(index=clust1subs, columns=topfeats)
+    clust2dat = sampdat.reindex(index=clust2subs, columns=topfeats)
+    clust1mean = clust1dat.mean(axis=0)
+    clust2mean = clust2dat.mean(axis=0)
+    if clust1mean.mean() > clust2mean.mean():
+        pos_means = clust1mean
+        neg_means = clust2mean
+        clust_renamed = clusters[0].astype(str).replace(['1','2'], ['pos','neg'])
+    elif clust1mean.mean() < clust2mean.mean():
+        pos_means = clust2mean
+        neg_means = clust1mean
+        clust_renamed = clusters[0].astype(str).replace(['1','2'], ['neg','pos'])
+    cutoffs = (pos_means + neg_means) / 2
+    return clust_renamed, cutoffs
+
+
+def predict_clust(data, cutoffs):
+    """
+    Predict cluster membership for set of subjects using feature cutoff scores.
+    Classifies as postive if any feature surpasses cut-off value.
+    
+    Inputs:
+    -------------
+    data:   nxp dataframe where n is observations and p is features (i.e. ROIs)
+            Should be a pandas DataFrame with subject codes as index and only
+            features to be used in clustering as columns.
+            
+    cutoffs:   pandas DataFrame   
+                index = features of interest labels, values = weights 
+    
+    Returns:
+    predicted_clust:    pandas DataFrame
+                        index = subject codes passed from input data
+                        values = predicted cluster membership     
+    """
+    # Check all features against cut-offs
+    cutdata = data[cutoffs.index] > cutoffs 
+    # Classify as pos if any feature is above cutoff
+    cutdata_agg = cutdata.any(axis=1)
+    predicted_clust = cutdata_agg.astype(str).replace(['T', 'F'], ['pos', 'neg'])
+    return predicted_clust
 
 def main(infile, outdir, visit):
     # Select one visit, clean subj codes
@@ -161,11 +225,14 @@ def main(infile, outdir, visit):
     for resamp_run in range(10):
         # Get random sub-sample (without replacement) of group to feed into clustering
         # Currently set to 70% of group N
-        sampdat = subsample_data(dataframe)
+        sampdat, unsampdat = sample_data(dataframe)
         bestw, lowestw = skm_permute(sampdat)
-        km_wghtnorm, km_clust = skm_cluster(sampdat, lowestw)      
-        clust1_means, clust2_means = clust_centers(sampdat, km_clust)
-        
+        km_weight, km_clust = skm_cluster(sampdat, lowestw)      
+        samp_clust, cutoffs = calc_cutoffs(sampdat, km_weight, km_clust)
+        unsamp_clust = predict_clust(unsampdat, cutoffs)
+        # Log weights and cluster membership of resample run
+        weight_rslts[resamp_run] = km_weight[0]
+        clust_rslts[resamp_run] = pd.concat([samp_clust, unsamp_clust])
         
 if __name__ == '__main__':
 
@@ -194,6 +261,9 @@ if __name__ == '__main__':
         main(args.infile, args.outdir, args.visit)
 
 
+"""
+OLD CODE BELOW, FOR US AS REFERENCE ONLY
+"""
     # Load input spreadsheet into dataframe and select visit if multiple exist
     datclean = prepare_data(infile)
     datframe = pd.read_csv(infile, sep=None)
