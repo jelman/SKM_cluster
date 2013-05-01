@@ -269,16 +269,28 @@ def main(infile, outdir, visit):
         weight_rslts[resamp_run] = km_weight[0]
         clust_rslts[resamp_run] = pd.concat([samp_clust, unsamp_clust])
     # Create tight clusters and generate regional cut-offs to predict remaining subjects
+    weight_totals = weight_rslts.mean(axis=1)
     tight_subs = create_tighclust(clust_rslts)
     tight_clust, grpcutoffs = calc_cutoffs(dataframe.ix[tight_subs.index], 
-                                            pd.DataFrame(weight_rslts.mean(axis=1)), 
+                                            pd.DataFrame(weight_totals), 
                                             tight_subs)
     untight_clust = predict_clust(dataframe.ix[dataframe.index - tight_clust.index],
                                     grpcutoffs)
     all_clust = pd.concat([tight_clust, untight_clust])
+    weight_totals.name = 'WeightMean'
 
+    # Save out results of cluster membership and feature weights
+    all_clustout = os.path.join(outdir, 'ClusterResults.csv')
+    all_clust.to_csv(all_clustout, index=True, 
+                        index_label='SUBID', header=True,sep='\t')
+    print 'Cluster membership results saved to %s'%(all_clustout)
+    weight_totalsout = os.path.join(outdir, 'FeatureWeights.csv')
+    weight_totals.to_csv(weight_totalsout, index=True, 
+                            index_label='Feature', header=True,sep='\t')
+    print 'Mean feature weights saved to %s'%(weight_totalsout)
+        
     """
-    Or use the following?:
+    Or use the following to create group classification?:
     all_clust = predict_clust(dataframe, grpcutoffs) 
     
     Original version keeps members of tight clusters in these clusters. May rely more on 
@@ -286,18 +298,6 @@ def main(infile, outdir, visit):
     all subjects based on regional cut-offs. This may cause a subject that is part of one
     tight cluster to be classified as part of the other cluster.
     """
-    # Save out results of cluster membership and feature weights
-    all_clustout = os.path.join(outdir, 'ClusterResults.csv')
-    all_clust.to_csv(all_clustout, index=True, 
-                        index_label='SUBID', header=True,sep='\t')
-    print 'Cluster membership results saved to %s'%(all_clustout)
-    weight_totals = weight_rslts.mean(axis=1)
-    weight_totals.name = 'WeightMean'
-    weight_totalsout = os.path.join(outdir, 'FeatureWeights.csv')
-    weight_totals.to_csv(weight_totalsout, index=True, 
-                            index_label='Feature', header=True,sep='\t')
-    print 'Mean feature weights saved to %s'%(weight_totalsout)
-        
 ##########################################################################
         
 if __name__ == '__main__':
