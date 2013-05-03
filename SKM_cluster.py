@@ -257,7 +257,8 @@ def main(infile, outdir, visit):
     dataframe = prepare_data(infile, visit) 
     # Create empty frames to hold results of 
     weight_rslts, clust_rslts = create_rslts_frame(dataframe) 
-    for resamp_run in range(1000):
+    for resamp_run in range(10):
+        print 'Now starting re-sample run number %s'%(resamp_run)
         # Get random sub-sample (without replacement) of group to feed into clustering
         # Currently set to 70% of group N
         sampdat, unsampdat = sample_data(dataframe)
@@ -274,30 +275,26 @@ def main(infile, outdir, visit):
     tight_clust, grpcutoffs = calc_cutoffs(dataframe.ix[tight_subs.index], 
                                             pd.DataFrame(weight_totals), 
                                             tight_subs)
-    untight_clust = predict_clust(dataframe.ix[dataframe.index - tight_clust.index],
-                                    grpcutoffs)
+    untight_subdata = dataframe.ix[dataframe.index - tight_clust.index]
+    untight_clust = predict_clust(untight_subdata, grpcutoffs)
     all_clust = pd.concat([tight_clust, untight_clust])
+    grpcutoffs.name = 'Cutoff_Value'
     weight_totals.name = 'WeightMean'
 
     # Save out results of cluster membership and feature weights
-    all_clustout = os.path.join(outdir, 'ClusterResults.csv')
-    all_clust.to_csv(all_clustout, index=True, 
+    all_clust_out = os.path.join(outdir, 'ClusterResults.csv')
+    all_clust.to_csv(all_clust_out, index=True, 
                         index_label='SUBID', header=True,sep='\t')
-    print 'Cluster membership results saved to %s'%(all_clustout)
-    weight_totalsout = os.path.join(outdir, 'FeatureWeights.csv')
-    weight_totals.to_csv(weight_totalsout, index=True, 
+    print 'Cluster membership results saved to %s'%(all_clust_out)
+    weight_totals_out = os.path.join(outdir, 'FeatureWeights.csv')
+    weight_totals.to_csv(weight_totals_out, index=True, 
                             index_label='Feature', header=True,sep='\t')
-    print 'Mean feature weights saved to %s'%(weight_totalsout)
-        
-    """
-    Or use the following to create group classification?:
-    all_clust = predict_clust(dataframe, grpcutoffs) 
-    
-    Original version keeps members of tight clusters in these clusters. May rely more on 
-    how clustering classified them rather than regional cut-offs. Proposed version classifies
-    all subjects based on regional cut-offs. This may cause a subject that is part of one
-    tight cluster to be classified as part of the other cluster.
-    """
+    print 'Mean feature weights saved to %s'%(weight_totals_out)
+    grpcutoffs_out = os.path.join(outdir, 'CutoffValues.csv')
+    grpcutoffs.to_csv(grpcutoffs_out, index=True, 
+                            index_label='Feature', header=True,sep='\t')
+    print 'Regions and cutoff scores used to determine groups saved to %s'%(grpcutoffs_out)
+
 ##########################################################################
         
 if __name__ == '__main__':
