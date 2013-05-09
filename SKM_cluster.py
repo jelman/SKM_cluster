@@ -56,7 +56,7 @@ def skm_permute(data):
     """
     r_data = com.convert_to_r_dataframe(data)
     km_perm = sparcl.KMeansSparseCluster_permute(r_data,K=2,nperms=25)
-    best_L1bound = km_perm.rx2('best_L1bound')[0]
+    best_L1bound = km_perm.rx2('bestw')[0]
     wbounds = km_perm.rx2('wbounds')
     gaps = km_perm.rx2('gaps')
     bestgap = max(gaps)
@@ -226,7 +226,7 @@ def create_tighclust(clusterdata):
     return tight_subs
     
     
-def main(infile, outdir, nperms, weightsum, bound):
+def main(infile, outdir, nperm, weightsum, bound):
     """
     Function to run full script. Takes input from command line and runs 
     sparse k-means clustering with resampling to produce tight clusters.
@@ -238,7 +238,7 @@ def main(infile, outdir, nperms, weightsum, bound):
     dataframe = pd.read_csv(infile, sep=None, index_col=0)
     # Create empty frames to hold results of 
     weight_rslts, clust_rslts = create_rslts_frame(dataframe) 
-    for resamp_run in range(nperms):
+    for resamp_run in range(nperm):
         print 'Now starting re-sample run number %s'%(resamp_run)
         # Get random sub-sample (without replacement) of group to feed into clustering
         # Currently set to 70% of group N
@@ -248,7 +248,7 @@ def main(infile, outdir, nperms, weightsum, bound):
             km_weight, km_clust = skm_cluster(sampdat, lowest_L1bound)      
 	else:
 	    km_weight, km_clust = skm_cluster(sampdat, best_L1bound)
-	samp_clust, sampcutoffs = calc_cutoffs(sampdat, km_weight, km_clust)
+	samp_clust, sampcutoffs = calc_cutoffs(sampdat, km_weight, weightsum, km_clust)
         unsamp_clust = predict_clust(unsampdat, sampcutoffs)
         # Log weights and cluster membership of resample run
         weight_rslts[resamp_run] = km_weight[0]
@@ -320,7 +320,7 @@ most important in clustering (default = 1.0)""")
 
             
         ### Begin running SKM clustering and resampling  
-        main(args.infile[0], args.outdir, args.nperms, args.weightsum, args.bound)
+        main(args.infile[0], args.outdir, args.nperm, args.weightsum, args.bound)
 
 
 
