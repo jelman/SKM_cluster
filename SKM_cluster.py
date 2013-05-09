@@ -226,7 +226,7 @@ def create_tighclust(clusterdata):
     return tight_subs
     
     
-def main(infile, outdir, nperms, weightsum, bound):
+def main(infile, outdir, nperm, weightsum, bound):
     """
     Function to run full script. Takes input from command line and runs 
     sparse k-means clustering with resampling to produce tight clusters.
@@ -238,7 +238,7 @@ def main(infile, outdir, nperms, weightsum, bound):
     dataframe = pd.read_csv(infile, sep=None, index_col=0)
     # Create empty frames to hold results of 
     weight_rslts, clust_rslts = create_rslts_frame(dataframe) 
-    for resamp_run in range(nperms):
+    for resamp_run in range(nperm):
         print 'Now starting re-sample run number %s'%(resamp_run)
         # Get random sub-sample (without replacement) of group to feed into clustering
         # Currently set to 70% of group N
@@ -320,7 +320,7 @@ most important in clustering (default = 1.0)""")
 
             
         ### Begin running SKM clustering and resampling  
-        main(args.infile[0], args.outdir, args.nperms, args.weightsum, args.bound)
+        main(args.infile[0], args.outdir, args.nperm, args.weightsum, args.bound)
 
 
 
