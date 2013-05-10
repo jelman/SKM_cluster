@@ -12,7 +12,7 @@ sparcl = rpy2.robjects.packages.importr("sparcl", lib_loc=sparcl_pth)
 
 
 def create_rslts_frame(dataframe):  
-    """ Create empty dataframe to hold eature weights and cluster 
+    """ Create empty pandas dataframe to hold feature weights and cluster 
     membership results of each resampling run""" 
     weight_rslts = pd.DataFrame(data=None, index = dataframe.columns)
     clust_rslts = pd.DataFrame(data=None, index = dataframe.index)
@@ -40,7 +40,8 @@ def skm_permute(data):
     
     Infile:
     ---------------
-    data: nxp dataframe where n is observations and p is features (i.e. ROIs)
+    data: pandas Dataframe
+            nxp dataframe where n is observations and p is features (i.e. ROIs)
             Should be a pandas DataFrame with subject codes as index and features 
             as columns.
     
@@ -253,11 +254,13 @@ def main(infile, outdir, nperm, weightsum, bound):
         # Log weights and cluster membership of resample run
         weight_rslts[resamp_run] = km_weight[0]
         clust_rslts[resamp_run] = pd.concat([samp_clust, unsamp_clust])
+
     # Create tight clusters and generate regional cut-offs to predict remaining subjects
     weight_totals = weight_rslts.mean(axis=1)
     tight_subs = create_tighclust(clust_rslts)
     tight_clust, grpcutoffs = calc_cutoffs(dataframe.ix[tight_subs.index], 
                                             pd.DataFrame(weight_totals), 
+                                            weightsum,
                                             tight_subs)
     all_clust = predict_clust(dataframe, grpcutoffs) 
     grpcutoffs.name = 'Cutoff_Value'
