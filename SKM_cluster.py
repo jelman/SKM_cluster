@@ -70,12 +70,12 @@ def create_rslts_frame(dataframe):
     return weight_rslts, clust_rslts
     
     
-def sample_data(data):
+def sample_data(data, split = .7):
     """
     Takes an array of data as input. Randomly samples 70% of the observations
     and returns as an array
     """
-    samp_n = int(.70 * len(data))
+    samp_n = int(split * len(data))
     rand_samp = sorted(random.sample(xrange(len(data)), samp_n))
     sampdata = data.take(rand_samp)
     unsamp_idx = [x for x in xrange(len(data)) if x not in rand_samp]

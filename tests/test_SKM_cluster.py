@@ -17,6 +17,18 @@ class Test_SKM_Cluster(TestCase):
     def test_run_command(self):
         return_code = skm.run_command('echo')
         assert_equal(return_code, 0)
-        
+        # test failure for missing function
+        return_code = skm.run_command('blueberry')
+        assert_equal(return_code, 127)
+
+    def test_get_sparcl_dir(self):
+        homedir = os.environ['HOME']
+        sparcl_dir = skm.get_sparcl_dir()
+        assert_equal(homedir in sparcl_dir, True)
+        assert_equal('rpackages' in sparcl_dir, True)
+        assert_equal('sparcl' in sparcl_dir, True)
+
+
+
 if __name__ == '__main__':
     unittest.main()
