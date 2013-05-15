@@ -12,7 +12,9 @@ class Test_SKM_Cluster(TestCase):
 
     def setUp(self):
         """ create small example data """
-        pass
+        rand_dat = np.random.random((10,20))
+        df = skm.pd.DataFrame(rand_dat)
+        self.data = df
 
     def test_run_command(self):
         return_code = skm.run_command('echo')
@@ -28,6 +30,16 @@ class Test_SKM_Cluster(TestCase):
         assert_equal('rpackages' in sparcl_dir, True)
         assert_equal('sparcl' in sparcl_dir, True)
 
+
+    def test_sample_data(self):
+        # test default 70% split
+        train, test = skm.sample_data(self.data)
+        assert_equal(train.shape[0], 7)
+        assert_equal(test.shape[0], 3)
+        # test 50% split
+        train, test = skm.sample_data(self.data, split = .5)
+        assert_equal(train.shape[0], 5)
+        assert_equal(test.shape[0], 5)
 
 
 if __name__ == '__main__':
