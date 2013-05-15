@@ -27,8 +27,10 @@ def run_command(cmd):
             print >>sys.stderr, "Child was terminated by signal", -retcode
         else:
             print >>sys.stderr, "Child returned", retcode
+        return retcode
     except OSError as e:
         print >>sys.stderr, "Execution failed:", e
+        return None
 
 def get_sparcl_dir():
     """ returns default location of sparcl library dir for this user"""
