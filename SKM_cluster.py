@@ -4,11 +4,60 @@ import pandas as pd
 import pandas.rpy.common as com
 import rpy2
 import random
-sparcl_pth = os.path.join(os.getenv('HOME'), 'R/packages')
-sparcl = rpy2.robjects.packages.importr("sparcl", lib_loc=sparcl_pth)
+import subprocess
 
 
+def r_installed():
+    """ check that r is installed on system
+    does not work on Windows """
+    try:
+        subprocess.check_output(['which','R'])
+        return True
+    except:
+        if 'win' in sys.platform:
+            print 'Warning: unable to check for R in windows'
+        return False
 
+ 
+def run_command(cmd):
+    """ run command, return stdout, stderr, returncode"""
+    try:
+        retcode = subprocess.call(cmd, shell=True)
+        if retcode < 0:
+            print >>sys.stderr, "Child was terminated by signal", -retcode
+        else:
+            print >>sys.stderr, "Child returned", retcode
+    except OSError as e:
+        print >>sys.stderr, "Execution failed:", e
+
+def get_sparcl_dir():
+    """ returns default location of sparcl library dir for this user"""
+    home = os.environ['HOME']
+    return os.path.join(home, '.rpackages', 'sparcl')
+    
+
+def sparcl_installed():
+    """ check if sparcl library is installed in default location
+    (default: /userhome/.rpackages/sparcl) """   
+    return os.path.isdir(get_sparcl_dir())
+
+def install_sparcl():
+    home = os.environ['HOME']
+    rpkg_dir = os.path.join(home, '.rpackages')
+    if not os.path.isdir(rpkg_dir):
+        os.mkdir(rpkg_dir)
+    curr_dir, _ = os.path.split(__file__)
+    sparcl_loc = os.path.join(curr_dir, 'sparcl')
+    cmd = ' '.join(['R', 'CMD', 'INSTALL', sparcl_loc, '-l', rpkg_dir])
+    run_command(cmd)
+    
+
+def import_sparcl():
+    if not sparclIinstalled():
+        install_sparcl()
+    sparcl_dir = get_sparcl_dir()
+    sparcl = rpy2.robjects.packages.importr("sparcl", lib_loc=sparcl_dir)
+    return sparcl
 
 
 def create_rslts_frame(dataframe):  
@@ -55,6 +104,7 @@ def skm_permute(data):
     	smallest tuning parameter that gives a gap statistic within 
         one sdgap of the largest gap statistic (sparser result)
     """
+    sparcl = import_sparcl()
     r_data = com.convert_to_r_dataframe(data)
     km_perm = sparcl.KMeansSparseCluster_permute(r_data,K=2,nperms=25)
     best_L1bound = km_perm.rx2('bestw')[0]
@@ -91,6 +141,7 @@ def skm_cluster(data, L1bound):
     km_clusters: pandas DataFrame
                 index = subject code, values = cluster membership
     """
+    sparcl = import_sparcl()
     # Convert pandas dataframe to R dataframe
     r_data = com.convert_to_r_dataframe(data)
     # Cluster observations using specified L1 bound
@@ -234,7 +285,8 @@ def main(infile, outdir, nperm, weightsum, bound):
     Regional cutoffs are derived from these tight clusters and subjects
     are classified based on these cutoffs.
     """
-    
+    # make sure we can import sparcl
+    import_sparcl()
     # Load data to dataframe
     dataframe = pd.read_csv(infile, sep=None, index_col=0)
     # Create empty frames to hold results of 
