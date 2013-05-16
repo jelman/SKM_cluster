@@ -15,6 +15,7 @@ class Test_SKM_Cluster(TestCase):
         rand_dat = np.random.random((10,20))
         df = skm.pd.DataFrame(rand_dat)
         self.data = df
+        self.homedir = os.environ['HOME']
 
     def test_run_command(self):
         return_code = skm.run_command('echo')
@@ -24,11 +25,16 @@ class Test_SKM_Cluster(TestCase):
         assert_equal(return_code, 127)
 
     def test_get_sparcl_dir(self):
-        homedir = os.environ['HOME']
+        homedir = self.homedir
         sparcl_dir = skm.get_sparcl_dir()
         assert_equal(homedir in sparcl_dir, True)
         assert_equal('rpackages' in sparcl_dir, True)
         assert_equal('sparcl' in sparcl_dir, True)
+
+    def test_import_sparcl(self):
+        ## test that sparcl is installed
+        sparcl = skm.import_sparcl()
+        assert_equal(skm.sparcl_installed(), True)
 
 
     def test_sample_data(self):

@@ -55,10 +55,11 @@ def install_sparcl():
     
 
 def import_sparcl():
-    if not sparclIinstalled():
+    if not sparcl_installed():
         install_sparcl()
     sparcl_dir = get_sparcl_dir()
-    sparcl = rpy2.robjects.packages.importr("sparcl", lib_loc=sparcl_dir)
+    rpkg_dir, _ = os.path.split(sparcl_dir)
+    sparcl = rpy2.robjects.packages.importr("sparcl", lib_loc=rpkg_dir)
     return sparcl
 
 
