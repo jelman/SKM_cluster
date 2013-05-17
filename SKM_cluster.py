@@ -310,6 +310,7 @@ def run_clustering(infile, nperm, weightsum, bound):
             weights.   
     
     Returns:
+    ----------
     weight_rslts: pandas Dataframe
                     nxp dataframe where n is the number of features and p is
                     the number of nperms. 
@@ -342,6 +343,92 @@ def run_clustering(infile, nperm, weightsum, bound):
         weight_rslts[resamp_run] = km_weight[0]
         clust_rslts[resamp_run] = pd.concat([samp_clust, unsamp_clust])
     return weight_rslts, clust_rslts
+    
+
+def classify_subjects(infile, weightsum, weight_rslts, clust_rslts):
+    """
+    Classifies subject into PIB+ and PIB- based on regional cut-offs
+    derived from sparse k-means clustering. 
+    
+    Inputs:
+    --------
+    infile: str
+            path to input datafile. First column should contain subject
+            codes and additional columns should correspond to features
+    weightsum: float
+                percentage of total feature weights to use in calculating cutoffs
+                Only features with the highest weights summing to this value will 
+                be used.
+    weight_rslts: pandas Dataframe
+                    nxp dataframe where n is the number of features and p is
+                    the number of nperms. 
+                    Index = feature names, values = feature weights
+    clust_rslts: pandas Dataframe
+                    nxp dataframe where n is the number of subject and p is
+                    the number of nperms. 
+                    Index = subject codes, values = cluster membership
+                    
+    Returns:
+    ---------
+    all_clust: pandas Dataframe
+                    Contains cluster membership for all subjects
+                    index = subject codes passed from input data
+                    values = predicted cluster membership  
+    weight_totals: pandas Dataframe
+                        Contains average weight for all feature s
+                        index = feature names
+                        values = average weight
+    grpcutoffs: pandas Dataframe
+                    Contains PIB value used as cutoff for all features
+                    index = feature names
+                    values = value used as cut-off between groups
+    """
+    # make sure we can import sparcl
+    import_sparcl()
+    # Load data to dataframe
+    dataframe = pd.read_csv(infile, sep=None, index_col=0)
+    # Create tight clusters and generate regional cut-offs to predict remaining subjects
+    weight_totals = weight_rslts.mean(axis=1)
+    tight_subs = create_tighclust(clust_rslts)
+    tight_clust, grpcutoffs = calc_cutoffs(dataframe.ix[tight_subs.index], 
+                                            pd.DataFrame(weight_totals), 
+                                            weightsum,
+                                            tight_subs)
+    all_clust = predict_clust(dataframe, grpcutoffs) 
+    grpcutoffs.name = 'Cutoff_Value'
+    weight_totals.name = 'WeightMean'    
+    return all_clust, grpcutoffs, weight_totals
+    
+def save_results(outdir, all_clust, weight_totals, grpcutoff):
+    """
+    
+    
+    Returns:
+    ---------
+    all_clust_out: str
+                    path to ClusterResults.csv, contains cluster membership 
+                    of all subjects
+    weight_totals_out: str
+                        path to FeatureWeights.csv. contains average weight
+                        for each feature
+    grpcutoffs_out: str
+                        path to CutoffValues.csv, contains cutoff value for
+                        each feature used to classify subjects
+    """
+    
+    # Save out results of cluster membership and feature weights
+    all_clust_out = os.path.join(outdir, 'ClusterResults.csv')
+    all_clust.to_csv(all_clust_out, index=True, 
+                        index_label='SUBID', header=True,sep='\t')
+    print 'Cluster membership results saved to %s'%(all_clust_out)
+    weight_totals_out = os.path.join(outdir, 'FeatureWeights.csv')
+    weight_totals.to_csv(weight_totals_out, index=True, 
+                            index_label='Feature', header=True,sep='\t')
+    print 'Mean feature weights saved to %s'%(weight_totals_out)
+    grpcutoffs_out = os.path.join(outdir, 'CutoffValues.csv')
+    grpcutoffs.to_csv(grpcutoffs_out, index=True, 
+                            index_label='Feature', header=True,sep='\t')
+    print 'Regions and cutoff scores used to determine groups saved to %s'%(grpcutoffs_out)
     
     
 def main(infile, outdir, nperm, weightsum, bound):
