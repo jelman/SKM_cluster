@@ -1,0 +1,41 @@
+---------------------------------------------------------------------------
+RRuntimeError                             Traceback (most recent call last)
+/usr/local/epd/lib/python2.7/site-packages/ipython-0.13.1-py2.7.egg/IPython/utils/py3compat.pyc in execfile(fname, *where)
+    176             else:
+    177                 filename = fname
+--> 178             __builtin__.execfile(filename, *where)
+
+/home/jagust/jelman/CODE/SKM_resample/SKM_cluster.py in <module>()
+    379 
+    380         ### Begin running SKM clustering and resampling
+--> 381         main(args.infile[0], args.outdir, args.nperm, args.weightsum, args.bound)
+    382 
+    383 
+
+/home/jagust/jelman/CODE/SKM_resample/SKM_cluster.py in main(infile, outdir, nperm, weightsum, bound)
+    300         # Currently set to 70% of group N
+    301         sampdat, unsampdat = sample_data(dataframe)
+--> 302         best_L1bound, lowest_L1bound = skm_permute(sampdat)
+    303         if bound == 'sparse':
+    304             km_weight, km_clust = skm_cluster(sampdat, lowest_L1bound)
+
+/home/jagust/jelman/CODE/SKM_resample/SKM_cluster.py in skm_permute(data)
+    110     sparcl = import_sparcl()
+    111     r_data = com.convert_to_r_dataframe(data)
+--> 112     km_perm = sparcl.KMeansSparseCluster_permute(r_data,K=2,nperms=25)
+    113     best_L1bound = km_perm.rx2('bestw')[0]
+    114     wbounds = km_perm.rx2('wbounds')
+
+/usr/local/epd/lib/python2.7/site-packages/rpy2-2.3.4-py2.7-linux-x86_64.egg/rpy2/robjects/functions.pyc in __call__(self, *args, **kwargs)
+     84                 v = kwargs.pop(k)
+     85                 kwargs[r_k] = v
+---> 86         return super(SignatureTranslatedFunction, self).__call__(*args, **kwargs)
+
+/usr/local/epd/lib/python2.7/site-packages/rpy2-2.3.4-py2.7-linux-x86_64.egg/rpy2/robjects/functions.pyc in __call__(self, *args, **kwargs)
+     33         for k, v in kwargs.iteritems():
+     34             new_kwargs[k] = conversion.py2ri(v)
+---> 35         res = super(Function, self).__call__(*new_args, **new_kwargs)
+     36         res = conversion.ri2py(res)
+     37         return res
+
+RRuntimeError: Error in array(STATS, dims[perm]) : 'dims' cannot be of length 0

@@ -1,0 +1,10 @@
+- Determine whether taking the top 50% of feature weights for creating cutoffs is ideal
+
+
+- Cluster labels are arbitrary and may switch from one resample to another. The calc_cutoffs relabels to 'pos' and 'neg' based on which set of features has a higher mean. Should be ok, but maybe there is a better way? 
+
+- calc_cutoffs function is somewhat verbose. Would it make sense to operate on a single groupedby dataframe rather than creating separate datraframes for each group? This may be addressed be refactoring to python class.
+
+- Need to insert tests:
+	- Currently, the column containing cluster weights and membership in each resample is labeled as int value '0'. This works in the context of the main script as R generates this as the column label. However, if functions are to be used independently it may be worthwhile to explicitly name this column or select using data[data.columns[0]]. 
+	- Verify that original datafile is in correct format (ie. first column is subject codes, all remaining columns are features)
