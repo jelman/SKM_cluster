@@ -331,14 +331,14 @@ def run_clustering(infile, nperm, weightsum, bound):
         print 'Now starting re-sample run number %s'%(resamp_run)
         # Get random sub-sample (without replacement) of group to feed into clustering
         # Currently set to 70% of group N
-        sampdat, unsampdat = sample_data(dataframe)
-        best_L1bound, lowest_L1bound = skm_permute(sampdat)
+        traindat, testdat = sample_data(dataframe)
+        best_L1bound, lowest_L1bound = skm_permute(traindat)
         if bound == 'sparse':
-            km_weight, km_clust = skm_cluster(sampdat, lowest_L1bound)      
+            km_weight, km_clust = skm_cluster(traindat, lowest_L1bound)      
         else:
-            km_weight, km_clust = skm_cluster(sampdat, best_L1bound)
-        samp_clust, sampcutoffs = calc_cutoffs(sampdat, km_weight, weightsum, km_clust)
-        unsamp_clust = predict_clust(unsampdat, sampcutoffs)
+            km_weight, km_clust = skm_cluster(traindat, best_L1bound)
+        samp_clust, sampcutoffs = calc_cutoffs(traindat, km_weight, weightsum, km_clust)
+        unsamp_clust = predict_clust(testdat, sampcutoffs)
         # Log weights and cluster membership of resample run
         weight_rslts[resamp_run] = km_weight[0]
         clust_rslts[resamp_run] = pd.concat([samp_clust, unsamp_clust])
