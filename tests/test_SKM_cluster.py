@@ -51,6 +51,9 @@ class Test_SKM_Cluster(TestCase):
         tmp = np.round(self.data.values).astype(str)
         tmp[:4,:] = '0'
         tmp[6:,:] = '1'
+        tmpdf = skm.pd.DataFrame(tmp)
+        # raise error of data not 'pos' and 'neg' values
+        assert_raises(KeyError, skm.create_tightclust, tmpdf)
         # create a dataframe with 'pos' and 'neg' values
         membership_data = skm.pd.DataFrame(tmp)
         membership_data[membership_data == '0'] = 'neg'
