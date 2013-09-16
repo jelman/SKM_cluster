@@ -47,6 +47,16 @@ class Test_SKM_Cluster(TestCase):
         assert_equal(train.shape[0], 5)
         assert_equal(test.shape[0], 5)
 
+    def test_create_tightclust(self):
+        tmp = np.round(self.data.values).astype(str)
+        tmp[:4,:] = '0'
+        tmp[6:,:] = '1'
+        # create a dataframe with 'pos' and 'neg' values
+        membership_data = skm.pd.DataFrame(tmp)
+        membership_data[membership_data == '0'] = 'neg'
+        membership_data[membership_data == '1'] = 'pos'
+        tight_subjects = skm.create_tightclust(membership_data)
+        assert_equal(tight_subjects.index.values, np.array([0,1,2,3,6,7,8,9]))
 
 if __name__ == '__main__':
     unittest.main()

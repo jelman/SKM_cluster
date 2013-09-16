@@ -264,7 +264,7 @@ def predict_clust(data, cutoffs):
     return predicted_clust
     
     
-def create_tighclust(clusterdata):
+def create_tightclust(clusterdata):
     """
     Creates tight clusters consisting of subjects classified as a member 
     of given cluster in at least 96% of resample runs.
@@ -283,7 +283,6 @@ def create_tighclust(clusterdata):
         Dataframe containing only subjects belonging to tight clusters
         and their cluster membership
     """
-        
     clust_totals = clusterdata.apply(pd.value_counts, axis=1)
     clust_pct = clust_totals / len(clusterdata.columns)
     pos_subs = clust_pct.index[clust_pct['pos'] > .96]
@@ -402,7 +401,7 @@ def classify_subjects(infile, weightsum, weight_rslts, clust_rslts):
     # Create tight clusters and generate regional cut-offs to 
     # predict remaining subjects
     weight_totals = weight_rslts.mean(axis=1)
-    tight_subs = create_tighclust(clust_rslts)
+    tight_subs = create_tightclust(clust_rslts)
     tight_clust, grpcutoffs = calc_cutoffs(dataframe.ix[tight_subs.index], 
                                             pd.DataFrame(weight_totals), 
                                             weightsum,
@@ -484,8 +483,8 @@ def main(infile, outdir, nperm, weightsum, bound):
                                                             clust_rslts)
     (all_clust_out, 
      weight_totals_out,
-     grpcutoffs_out = save_results(outdir, 
-                                   all_clust, weight_totals, grpcutoffs)
+     grpcutoffs_out) = save_results(outdir, 
+                                    all_clust, weight_totals, grpcutoffs)
 
 ##########################################################################
         
