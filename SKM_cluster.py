@@ -86,22 +86,23 @@ def sample_data(data, split = .7):
 
 def skm_permute(data):
     """
-    rpy2 wrapper for R function: KMeansSparseCluster.permute from the sparcl package.
-    The tuning parameter controls the L1 bound on w, the feature weights. A permutation 
-    approach is used to select the tuning parameter. 
+    rpy2 wrapper for R function: KMeansSparseCluster.permute from the 
+    sparcl package.
+    The tuning parameter controls the L1 bound on w, the feature weights. 
+    A permutation approach is used to select the tuning parameter. 
     
-    Infile:
-    ---------------
+    Infile
+    ------
     data: pandas Dataframe
-            nxp dataframe where n is observations and p is features (i.e. ROIs)
-            Should be a pandas DataFrame with subject codes as index and features 
-            as columns.
+        n by p dataframe where n is observations and p is features (i.e. ROIs)
+        Should be a pandas DataFrame with subject codes as index and features 
+        as columns.
     
-    Returns:
-    ---------------
+    Returns
+    -------
     best_L1bound: float
     	tuning parameter that returns the highest gap statistic
-	(more features given non-zero weights)
+	    (more features given non-zero weights)
     
     lowest_L1bound: float
     	smallest tuning parameter that gives a gap statistic within 
@@ -115,8 +116,10 @@ def skm_permute(data):
     gaps = km_perm.rx2('gaps')
     bestgap = max(gaps)
     sdgaps = km_perm.rx2('sdgaps')
-    # Calculate smallest wbound that returns gap stat within one sdgap of best wbound
-    wbound_rnge = [wbounds[i] for i in range(len(gaps)) if (gaps[i]+sdgaps[i]>=bestgap)]
+    # Calculate smallest wbound that returns gap stat 
+    # within one sdgap of best wbound
+    wbound_rnge = [wbounds[i] for i in range(len(gaps)) if \
+            (gaps[i]+sdgaps[i]>=bestgap)]
     lowest_L1bound = min(wbound_rnge)
     return best_L1bound, lowest_L1bound
     
@@ -124,26 +127,27 @@ def skm_permute(data):
 def skm_cluster(data, L1bound):
     """
     rpy2 wrapper for R function: KMeansSparseCluster from the sparcl package.
-    This function performs sparse k-means clustering. You must specify L1 bound on w, 
-    the feature weights. 
+    This function performs sparse k-means clustering. 
+    You must specify L1 bound on w, the feature weights. 
     
-    Note: A smaller L1 bound will results in sparser weighting. If a large number of 
-    features are included, it may be useful to use the smaller tuning parameter 
-    returned by KMeansSparseCluster.permute wrapper function.
+    Note: A smaller L1 bound will results in sparser weighting. 
+    If a large number of features are included, it may be useful to use 
+    the smaller tuning parameter returned by 
+    KMeansSparseCluster.permute wrapper function.
     
-    Infile:
-    ---------------
+    Infile
+    ------
     data: pandas Dataframe
-            nxp dataframe where n is observations and p is features (i.e. ROIs)
-            Should be a pandas DataFrame with subject codes as index and features 
-            as columns.
+        n by p dataframe where n is observations and p is features (i.e. ROIs)
+        Should be a pandas DataFrame with subject codes as index and features 
+        as columns.
     
-    Returns:
-    ---------------
+    Returns
+    -------
     km_weights: pandas DataFrame   
-                index = feature labels, values = weights
+        index = feature labels, values = weights
     km_clusters: pandas DataFrame
-                index = subject code, values = cluster membership
+        index = subject code, values = cluster membership
     """
     sparcl = import_sparcl()
     # Convert pandas dataframe to R dataframe
@@ -173,30 +177,30 @@ def calc_cutoffs(data, weights, weightsum, clusters):
     does not consistently assign the same label to groups across runs. 
     
     Inputs
-    ----------
+    ------
     data:   pandas Dataframe
-            nxp dataframe where n is observations and p is features (i.e. ROIs)
-            Should be a pandas DataFrame with subject codes as index and features 
-            as columns.
+        n by p dataframe where n is observations and p is features (i.e. ROIs)
+        Should be a pandas DataFrame with subject codes as index and features 
+        as columns.
             
     weights:    pandas Dataframe   
-                index = feature labels, values = weights
+        index = feature labels, values = weights
     weightsum:  float
-                cluster cut-offs will be determined for only for features with weihts
-                in the top percentile specified
+        cluster cut-offs will be determined only for features with weights
+        in the top percentile specified
     clusters:   pandas Dataframe
-                index = subject code, values = cluster membership
+        index = subject code, values = cluster membership
     
-    Returns:
-    ----------
+    Returns
+    -------
     clust_renamed:  pandas Dataframe
-                    renamed version of clusters input such that integer labels
-                    are replaced with appropriate string label ('pos' or 'neg')
+        renamed version of clusters input such that integer labels
+        are replaced with appropriate string label ('pos' or 'neg')
     
     cutoffs:    pandas Dataframe
-                index = features labels accounting for to 50% of weights
-                values = cut-off score determined as mid-point of cluster means
-                        for each feature
+        index = features labels accounting for top 50% of weights
+        values = cut-off score determined as mid-point of cluster means
+        for each feature
     
     Note:
     The cluster means may be used to create cut-off scores (i.e. the midpoint 
@@ -218,11 +222,13 @@ def calc_cutoffs(data, weights, weightsum, clusters):
     if clust1mean.mean() > clust2mean.mean():
         pos_means = clust1mean
         neg_means = clust2mean
-        clust_renamed = clusters[0].astype(str).replace(['1','2'], ['pos','neg'])
+        clust_renamed = clusters[0].astype(str).replace(['1','2'], 
+                                                        ['pos','neg'])
     elif clust1mean.mean() < clust2mean.mean():
         pos_means = clust2mean
         neg_means = clust1mean
-        clust_renamed = clusters[0].astype(str).replace(['1','2'], ['neg','pos'])
+        clust_renamed = clusters[0].astype(str).replace(['1','2'], 
+                                                        ['neg','pos'])
     cutoffs = (pos_means + neg_means) / 2
     clust_renamed.name = 'PIB_Status'
     return clust_renamed, cutoffs
@@ -233,47 +239,49 @@ def predict_clust(data, cutoffs):
     Predict cluster membership for set of subjects using feature cutoff scores.
     Classifies as postive if any feature surpasses cut-off value.
     
-    Inputs:
-    -------------
+    Inputs
+    ------
     data:   pandas DataFrame  
-            nxp dataframe where n is observations and p is features (i.e. ROIs)
-            Should include subject codes as index and features 
-            as columns.
+        n by p dataframe where n is observations and p is features (i.e. ROIs)
+        Should include subject codes as index and features as columns.
             
     cutoffs:   pandas DataFrame   
-                index = features of interest labels, values = weights 
+        index = features of interest labels, values = weights 
     
-    Returns:
+    Returns
+    -------
     predicted_clust:    pandas DataFrame
-                        index = subject codes passed from input data
-                        values = predicted cluster membership     
+        index = subject codes passed from input data
+        values = predicted cluster membership     
     """
     # Check all features against cut-offs
     cutdata = data[cutoffs.index] > cutoffs 
     # Classify as pos if any feature is above cutoff
     cutdata_agg = cutdata.any(axis=1)
-    predicted_clust = cutdata_agg.astype(str).replace(['T', 'F'], ['pos', 'neg'])
+    predicted_clust = cutdata_agg.astype(str).replace(['T', 'F'], 
+                                                      ['pos', 'neg'])
     predicted_clust.name = 'PIB_Status'
     return predicted_clust
     
     
 def create_tighclust(clusterdata):
     """
-    Creates tight clusters consisting of subjects classified as a member of given 
-    cluster in at least 96% of resample runs.
+    Creates tight clusters consisting of subjects classified as a member 
+    of given cluster in at least 96% of resample runs.
     
-    Inputs:
-    ------------
+    Inputs
+    ------
     clusterdata: pandas Dataframe
-                    Dataframe containing cluster membership over all resamples
-                    index = subject code 
-                    columns = resample run 
-                    values = cluster membership
-    Returns:
-    ------------
+        Dataframe containing cluster membership over all resamples
+        index = subject code 
+        columns = resample run 
+        values = cluster membership
+    
+    Returns
+    -------
     tight_subs: pandas Dataframe 
-                Dataframe containing only subjects belonging to tight clusters
-                and their cluster membership
+        Dataframe containing only subjects belonging to tight clusters
+        and their cluster membership
     """
         
     clust_totals = clusterdata.apply(pd.value_counts, axis=1)
@@ -292,33 +300,33 @@ def run_clustering(infile, nperm, weightsum, bound):
     subset of subjects. These clusters of subjects are used to generate 
     regional cut-offs in order to classify the remaining subjects in the sample.
     
-    Inputs:
-    ---------
+    Inputs
+    ------
     infile: str
-            path to input datafile. First column should contain subject
-            codes and additional columns should correspond to features
+        path to input datafile. First column should contain subject
+        codes and additional columns should correspond to features
     nperm: int
-            number of clustering resample runs
+        number of clustering resample runs
     weightsum: float
-                percentage of total feature weights to use in calculating cutoffs
-                Only features with the highest weights summing to this value will 
-                be used.
+        percentage of total feature weights to use in calculating cutoffs
+        Only features with the highest weights summing to this value will 
+        be used.
     bound: str  ['best' or 'sparse']
-            Determines which value generated by SKM permutation to use as
-            L1 bound in clustering. This tuning parameter determines how weights 
-            will be distributed among feratures. 'best' will give more non-zero 
-            weights.   
+        Determines which value generated by SKM permutation to use as
+        L1 bound in clustering. This tuning parameter determines how weights 
+        will be distributed among features. 'best' will give more non-zero 
+        weights.   
     
-    Returns:
-    ----------
+    Returns
+    -------
     weight_rslts: pandas Dataframe
-                    nxp dataframe where n is the number of features and p is
-                    the number of nperms. 
-                    Index = feature names, values = feature weights
+        n by p dataframe where n is the number of features and p is
+        the number of permutations (nperms). 
+        index = feature names, values = feature weights
     clust_rslts: pandas Dataframe
-                    nxp dataframe where n is the number of subject and p is
-                    the number of nperms. 
-                    Index = subject codes, values = cluster membership
+        n by p dataframe where n is the number of subject and p is
+        the number of nperms. 
+        index = subject codes, values = cluster membership
             
     """
     # make sure we can import sparcl
@@ -329,7 +337,8 @@ def run_clustering(infile, nperm, weightsum, bound):
     weight_rslts, clust_rslts = create_rslts_frame(dataframe) 
     for resamp_run in range(nperm):
         print 'Now starting re-sample run number %s'%(resamp_run)
-        # Get random sub-sample (without replacement) of group to feed into clustering
+        # Get random sub-sample (without replacement) of group 
+        # to feed into clustering
         # Currently set to 70% of group N
         traindat, testdat = sample_data(dataframe)
         best_L1bound, lowest_L1bound = skm_permute(traindat)
@@ -337,7 +346,10 @@ def run_clustering(infile, nperm, weightsum, bound):
             km_weight, km_clust = skm_cluster(traindat, lowest_L1bound)      
         else:
             km_weight, km_clust = skm_cluster(traindat, best_L1bound)
-        samp_clust, sampcutoffs = calc_cutoffs(traindat, km_weight, weightsum, km_clust)
+        samp_clust, sampcutoffs = calc_cutoffs(traindat, 
+                                               km_weight, 
+                                               weightsum, 
+                                               km_clust)
         unsamp_clust = predict_clust(testdat, sampcutoffs)
         # Log weights and cluster membership of resample run
         weight_rslts[resamp_run] = km_weight[0]
@@ -350,44 +362,45 @@ def classify_subjects(infile, weightsum, weight_rslts, clust_rslts):
     Classifies subject into PIB+ and PIB- based on regional cut-offs
     derived from sparse k-means clustering. 
     
-    Inputs:
-    --------
-    infile: str
-            path to input datafile. First column should contain subject
-            codes and additional columns should correspond to features
+    Inputs
+    ------
+    infile: str (filename)
+        path to input datafile. First column should contain subject
+        codes and additional columns should correspond to features
     weightsum: float
-                percentage of total feature weights to use in calculating cutoffs
-                Only features with the highest weights summing to this value will 
-                be used.
+        percentage of total feature weights to use in calculating cutoffs
+        Only features with the highest weights summing to this value will 
+        be used.
     weight_rslts: pandas Dataframe
-                    nxp dataframe where n is the number of features and p is
-                    the number of nperms. 
-                    Index = feature names, values = feature weights
+        n by p dataframe where n is the number of features and p is
+        the number of permutations (nperms). 
+        index = feature names, values = feature weights
     clust_rslts: pandas Dataframe
-                    nxp dataframe where n is the number of subject and p is
-                    the number of nperms. 
-                    Index = subject codes, values = cluster membership
+        n by p dataframe where n is the number of subject and p is
+        the number of nperms. 
+        index = subject codes, values = cluster membership
                     
-    Returns:
-    ---------
+    Returns
+    -------
     all_clust: pandas Dataframe
-                    Contains cluster membership for all subjects
-                    index = subject codes passed from input data
-                    values = predicted cluster membership  
+        Contains cluster membership for all subjects
+        index = subject codes passed from input data
+        values = predicted cluster membership  
     weight_totals: pandas Dataframe
-                        Contains average weight for all feature s
-                        index = feature names
-                        values = average weight
+        Contains average weight for all feature s
+        index = feature names
+        values = average weight
     grpcutoffs: pandas Dataframe
-                    Contains PIB value used as cutoff for all features
-                    index = feature names
-                    values = value used as cut-off between groups
+        Contains PIB value used as cutoff for all features
+        index = feature names
+        values = value used as cut-off between groups
     """
     # make sure we can import sparcl
     import_sparcl()
     # Load data to dataframe
     dataframe = pd.read_csv(infile, sep=None, index_col=0)
-    # Create tight clusters and generate regional cut-offs to predict remaining subjects
+    # Create tight clusters and generate regional cut-offs to 
+    # predict remaining subjects
     weight_totals = weight_rslts.mean(axis=1)
     tight_subs = create_tighclust(clust_rslts)
     tight_clust, grpcutoffs = calc_cutoffs(dataframe.ix[tight_subs.index], 
@@ -401,58 +414,66 @@ def classify_subjects(infile, weightsum, weight_rslts, clust_rslts):
     
 def save_results(outdir, all_clust, weight_totals, grpcutoffs):
     """
-    Inputs:
-    ---------
+    Inputs
+    ------
     outdir: str
-                Path to save output files
+        Location (path) to save output files
     all_clust: pandas Dataframe
-                    Contains cluster membership for all subjects
-                    index = subject codes passed from input data
-                    values = predicted cluster membership  
+        Contains cluster membership for all subjects
+        index = subject codes passed from input data
+        values = predicted cluster membership  
     weight_totals: pandas Dataframe
-                        Contains average weight for all feature s
-                        index = feature names
-                        values = average weight
+        Contains average weight for all features
+        index = feature names
+        values = average weight
     grpcutoffs: pandas Dataframe
-                    Contains PIB value used as cutoff for all features
-                    index = feature names
-                    values = value used as cut-off between groups    
+        Contains PIB value used as cutoff for all features
+        index = feature names
+        values = value used as cut-off between groups    
     
-    Returns:
-    ---------
+    Returns
+    -------
     all_clust_out: str
-                    path to ClusterResults.csv, contains cluster membership 
-                    of all subjects
+        path to ClusterResults.csv, contains cluster membership 
+        of all subjects
     weight_totals_out: str
-                        path to FeatureWeights.csv. contains average weight
-                        for each feature
+        path to FeatureWeights.csv. contains average weight
+        for each feature
     grpcutoffs_out: str
-                        path to CutoffValues.csv, contains cutoff value for
-                        each feature used to classify subjects
+        path to CutoffValues.csv, contains cutoff value for
+        each feature used to classify subjects
     """
     
     # Save out results of cluster membership and feature weights
     all_clust_out = os.path.join(outdir, 'ClusterResults.csv')
-    all_clust.to_csv(all_clust_out, index=True, 
-                        index_label='SUBID', header=True,sep='\t')
+    all_clust.to_csv(all_clust_out, 
+                     index=True, 
+                     index_label='SUBID', 
+                     header=True,sep='\t')
     print 'Cluster membership results saved to %s'%(all_clust_out)
     
     weight_totals_out = os.path.join(outdir, 'FeatureWeights.csv')
-    weight_totals.to_csv(weight_totals_out, index=True, 
-                            index_label='Feature', header=True,sep='\t')
+    weight_totals.to_csv(weight_totals_out, 
+                         index=True, 
+                         index_label='Feature', 
+                         header=True,sep='\t')
     print 'Mean feature weights saved to %s'%(weight_totals_out)
     
     grpcutoffs_out = os.path.join(outdir, 'CutoffValues.csv')
-    grpcutoffs.to_csv(grpcutoffs_out, index=True, 
-                            index_label='Feature', header=True,sep='\t')
-    print 'Regions and cutoff scores used to determine groups saved to %s'%(grpcutoffs_out)
+    grpcutoffs.to_csv(grpcutoffs_out, 
+                      index=True, 
+                      index_label='Feature', 
+                      header=True,sep='\t')
+    print 'Regions and cutoff scores used to determine groups saved'\
+            'to %s'%(grpcutoffs_out)
     return all_clust_out, weight_totals_out, grpcutoffs_out
     
     
 def main(infile, outdir, nperm, weightsum, bound):
     """
-    Function to run full script. Takes input from command line and runs 
-    sparse k-means clustering with resampling to produce tight clusters.
+    Function to run full script. Takes input generated from command line 
+    and runs sparse k-means clustering with resampling to produce tight 
+    clusters.
     Regional cutoffs are derived from these tight clusters and subjects
     are classified based on these cutoffs. Saves out results to file.
     """
@@ -461,10 +482,10 @@ def main(infile, outdir, nperm, weightsum, bound):
                                                             weightsum, 
                                                             weight_rslts, 
                                                             clust_rslts)
-    all_clust_out, weight_totals_out, grpcutoffs_out = save_results(outdir, 
-                                                                    all_clust, 
-                                                                    weight_totals, 
-                                                                    grpcutoffs)
+    (all_clust_out, 
+     weight_totals_out,
+     grpcutoffs_out = save_results(outdir, 
+                                   all_clust, weight_totals, grpcutoffs)
 
 ##########################################################################
         
@@ -474,8 +495,8 @@ if __name__ == '__main__':
     Sparse K-means Clustering with re-sampling to cluster subjects into 
     PIB+ and PIB- groups.
     -------------------------------------------------------------------""",
-                                    formatter_class=argparse.RawTextHelpFormatter,
-                                    epilog= """
+        formatter_class=argparse.RawTextHelpFormatter,
+        epilog= """
     -------------------------------------------------------------------
     NOTE: Format of infile should be a spreadsheet with first column 
     containing subject codes and the remaining columns corresponding to 
@@ -491,13 +512,13 @@ if __name__ == '__main__':
     parser.add_argument('-weightsum', type=float, dest = 'weightsum', 
                         default = 1.0, 
             help = """Only determine cutoffs for features with weights making 
-up the top percentile specified. Constrains the number 
-of features used for classification to those that were 
-most important in clustering (default = 1.0)""")
+            up the top percentile specified. Constrains the number 
+            of features used for classification to those that were 
+            most important in clustering (default = 1.0)""")
     parser.add_argument('-bound', type=str, choices=['best', 'sparse'],
                         dest='bound', default='best',
             help="""method to determine L1bound, best result, or best  
-    sparse result""")
+            sparse result""")
 	
 
     if len(sys.argv) == 1:
@@ -509,7 +530,11 @@ most important in clustering (default = 1.0)""")
 
             
         ### Begin running SKM clustering and resampling  
-        main(args.infile[0], args.outdir, args.nperm, args.weightsum, args.bound)
+        main(args.infile[0], 
+             args.outdir, 
+             args.nperm, 
+             args.weightsum, 
+             args.bound)
 
 
 
