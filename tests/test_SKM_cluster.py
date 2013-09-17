@@ -61,5 +61,25 @@ class Test_SKM_Cluster(TestCase):
         tight_subjects = skm.create_tightclust(membership_data)
         assert_equal(tight_subjects.index.values, np.array([0,1,2,3,6,7,8,9]))
 
+    def test_skm_permute(self):
+        tmp = self.data.values.copy()
+        tmp = (tmp - 0.5) / 2.0
+        tmp[:5, :10] = tmp[:5, :10] - 0.9
+        tmp[5:, :10] = tmp[5:, :10] + 0.9
+        tmpdf = skm.pd.DataFrame(tmp)
+        best_L1bound, lowest_L1bound = skm.skm_permute(tmpdf)
+        assert_equal(best_L1bound> lowest_L1bound, True)
+        assert_almost_equal(best_L1bound, 3.518520979)
+
+    def test_skm_cluster(self):
+        tmp = self.data.values.copy()
+        tmp = (tmp - 0.5) / 2.0
+        tmp[:5, :10] = tmp[:5, :10] - 0.9
+        tmp[5:, :10] = tmp[5:, :10] + 0.9
+        tmpdf = skm.pd.DataFrame(tmp)
+        best_L1bound = 3.518520979
+        km_weight, km_clust = skm.skm_cluster(tmpdf, best_L1bound)
+        assert_equal(km_clust[0].values, np.array(5*[1] + 5 * [2]))
+
 if __name__ == '__main__':
     unittest.main()
