@@ -90,7 +90,23 @@ class Test_SKM_Cluster(TestCase):
         alldf = skm.pd.DataFrame(all, index = index, columns=('weights',))
         topfeat, sweights, elbow = skm.find_elbow(alldf)
         assert_equal(elbow, 48)
-        
+
+
+    def test_parse_clusters(self):
+        data = np.zeros((60,100))
+        ids = ['B%03d'%x for x in range(len(data))]
+        features = ['feature_%04d'%x for x in range(data.shape[1])]
+        data_df = skm.pd.DataFrame(data, index=ids, columns=features)
+        # define 3 groups
+        clust_dat = 10* [1] + 20 * [2] + 30 * [3]
+        clust_df = skm.pd.DataFrame({'cluster':clust_dat}, index=ids)
+        top_features = features[:10]
+        cluster_dats = skm.parse_clusters(clust_df, data_df, top_features)
+        assert_equal(cluster_dats[0].shape, (10,10))
+        assert_equal(cluster_dats[1].shape, (20,10))
+        assert_equal(cluster_dats[2].shape, (30,10))
+
+
     def test_make_vector(self):
         p0 = [0, 2]
         px = [100,0]

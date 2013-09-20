@@ -86,7 +86,7 @@ def sample_data(data, split = .7):
     return sampdata, unsampdata
 
 
-def skm_permute(data):
+def skm_permute(data, k=2, nperms=25):
     """
     rpy2 wrapper for R function: KMeansSparseCluster.permute from the 
     sparcl package.
@@ -112,7 +112,7 @@ def skm_permute(data):
     """
     sparcl = import_sparcl()
     r_data = com.convert_to_r_dataframe(data)
-    km_perm = sparcl.KMeansSparseCluster_permute(r_data,K=2,nperms=25)
+    km_perm = sparcl.KMeansSparseCluster_permute(r_data,K=k,nperms=nperms)
     best_L1bound = km_perm.rx2('bestw')[0]
     wbounds = km_perm.rx2('wbounds')
     gaps = km_perm.rx2('gaps')
@@ -126,7 +126,7 @@ def skm_permute(data):
     return best_L1bound, lowest_L1bound
     
     
-def skm_cluster(data, L1bound):
+def skm_cluster(data, L1bound, k=2):
     """
     rpy2 wrapper for R function: KMeansSparseCluster from the sparcl package.
     This function performs sparse k-means clustering. 
@@ -155,7 +155,7 @@ def skm_cluster(data, L1bound):
     # Convert pandas dataframe to R dataframe
     r_data = com.convert_to_r_dataframe(data)
     # Cluster observations using specified L1 bound
-    km_out = sparcl.KMeansSparseCluster(r_data,K=2, wbounds=L1bound)
+    km_out = sparcl.KMeansSparseCluster(r_data,K=k, wbounds=L1bound)
     # Create dictionary of feature weights, normalized feature weights and
     # cluster membership
     ws = km_out.rx2(1).rx2('ws')
@@ -208,11 +208,20 @@ def find_elbow(weights):
     ## return top features
     return top_features, sorted_weights, elbow
 
+def parse_clusters(clusters, data, top_features):
+    """ given result of clustering, split on cluster_id,
+    grab top_features for each group, and return list of
+    reindexed DataFrames"""
+    col = clusters.columns[0]
+    cluster_ids = set(clusters[col])
+    cluster_indexes = [clusters[clusters[col] == x].index \
+            for x in cluster_ids]
+    cluster_dats = [data.reindex(index=c_index, columns=top_features) \
+                for c_index in cluster_indexes]
+    return cluster_dats
 
 
-
-
-def calc_cutoffs(data, weights, weightsum, clusters):
+def calc_cutoffs(data, weights, clusters, weightsum=None):
     """
     Determines the cluster centers for regions. This will only detmine cutoffs 
     for features with weights making up the top percentile specified. Clusters 
@@ -229,12 +238,14 @@ def calc_cutoffs(data, weights, weightsum, clusters):
             
     weights:    pandas Dataframe   
         index = feature labels, values = weights
-    weightsum:  float
-        cluster cut-offs will be determined only for features with weights
-        in the top percentile specified
     clusters:   pandas Dataframe
         index = subject code, values = cluster membership
-    
+     weightsum:  float or None
+        if None, elbow method used to find cutoff
+        else cut-offs will be determined only for features with weights
+        in the top percentile specified, (eg 0.5) will choose weights 
+        accounting for half of the weights
+   
     Returns
     -------
     clust_renamed:  pandas Dataframe
@@ -253,16 +264,13 @@ def calc_cutoffs(data, weights, weightsum, clusters):
     set a lower weightsum (i.e., .50). This will constrain the features used
     to classify subjects to only those that contributed most to clustering. 
     """
-    # Select features accounting for up to 50% of the weighting
-    sorted_weights = weights.sort(columns=0, ascending=False)
-    sum_weights = sorted_weights.cumsum()
-    topfeats = sum_weights[sum_weights[0] <= weightsum].index
-    clust1subs = clusters[clusters[0] == 1].index
-    clust2subs = clusters[clusters[0] == 2].index
-    clust1dat = data.reindex(index=clust1subs, columns=topfeats)
-    clust2dat = data.reindex(index=clust2subs, columns=topfeats)
-    clust1mean = clust1dat.mean(axis=0)
-    clust2mean = clust2dat.mean(axis=0)
+    if weightsum is None:
+        top_features, sorted_weights, elbow = find_elbow(weights)
+    else:
+        # Select features accounting for up to 50% of the weighting
+        sorted_weights = weights.sort(columns=0, ascending=False)
+        sum_weights = sorted_weights.cumsum()
+        top_features = sum_weights[sum_weights[0] <= weightsum].index
 
     ## XXXX NOTE 1, 2 are arbitrary, not based on cluster mean
     if clust1mean.mean() > clust2mean.mean():
