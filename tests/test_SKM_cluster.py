@@ -81,5 +81,24 @@ class Test_SKM_Cluster(TestCase):
         km_weight, km_clust = skm.skm_cluster(tmpdf, best_L1bound)
         assert_equal(km_clust[0].values, np.array(5*[1] + 5 * [2]))
 
+    def test_elbow(self):
+        big = np.linspace(1,.25,50)
+        little = np.linspace(.25,0,50)
+        all = np.concatenate((big, little))
+        all = all / all.sum()
+        index = ['reg_%04d'%x for x in range(all.shape[0])]
+        alldf = skm.pd.DataFrame(all, index = index, columns=('weights',))
+        topfeat, sweights, elbow = skm.find_elbow(alldf)
+        assert_equal(elbow, 48)
+        
+    def test_make_vector(self):
+        p0 = [0, 2]
+        px = [100,0]
+        vect = skm.make_vector(p0,px)
+        assert_equal(vect, np.array([100,-2]))
+
+
+
+
 if __name__ == '__main__':
     unittest.main()

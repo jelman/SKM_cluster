@@ -1,5 +1,7 @@
 import os, sys
 import argparse
+
+import numpy as np
 import pandas as pd
 import pandas.rpy.common as com
 import rpy2
@@ -166,8 +168,50 @@ def skm_cluster(data, L1bound):
     km_clusters = pd.DataFrame.from_dict(km_clusters)
     km_clusters = km_clusters.T
     return km_weightsnorm, km_clusters
-        
-        
+       
+
+def make_vector(p0, px):
+    """ given two points, create numpy vector array"""
+    p0 = np.asarray(p0)
+    px = np.asarray(px)
+    return px - p0
+
+def find_elbow(weights):
+    """ given the weights, sort, and determin the curve `elbow` by
+    finding the point that is furthest from the vector connecting
+    the largest and smallest weight"""
+    columns = weights.columns
+    sorted_weights = weights.sort(columns=columns[0], ascending=False)
+    sweights = sorted_weights[columns[0]].values
+    first = np.array([0,sweights[0]])
+    # b is vector between largest and smallest weight
+    b = make_vector(first,[sweights.shape[0], sweights[-1]])
+    # normalize vector
+    bhat = b / np.sqrt((b**2).sum())
+    # all but first weight
+    spoints = np.array([[val+1,x] for val, x in enumerate(sweights[1:])])
+    firstbig = np.tile(first.T, sweights.shape[0]-1)
+    firstbig.shape = spoints.shape
+    # vectors between largest weight and subsequent weight(s)
+    curve_vectors = spoints - firstbig
+    bhat_big = np.tile(bhat, sweights.shape[0]-1)
+    bhat_big.shape = spoints.shape
+    # project vector onto normalized b vector
+    tmp = map(np.dot, curve_vectors, bhat_big)
+    tmp2 = map(np.multiply, tmp, bhat_big)
+    # calc orth distance from b-vector to point, find largest dist
+    elbow = ((curve_vectors - tmp2)**2).sum(axis=1).argmax()
+    # find weights >= elbow weight
+    columns = sorted_weights.columns
+    mask = sorted_weights[columns[0]] >= sorted_weights[columns[0]][elbow]
+    top_features = sorted_weights[mask].index
+    ## return top features
+    return top_features, sorted_weights, elbow
+
+
+
+
+
 def calc_cutoffs(data, weights, weightsum, clusters):
     """
     Determines the cluster centers for regions. This will only detmine cutoffs 
@@ -219,6 +263,8 @@ def calc_cutoffs(data, weights, weightsum, clusters):
     clust2dat = data.reindex(index=clust2subs, columns=topfeats)
     clust1mean = clust1dat.mean(axis=0)
     clust2mean = clust2dat.mean(axis=0)
+
+    ## XXXX NOTE 1, 2 are arbitrary, not based on cluster mean
     if clust1mean.mean() > clust2mean.mean():
         pos_means = clust1mean
         neg_means = clust2mean
