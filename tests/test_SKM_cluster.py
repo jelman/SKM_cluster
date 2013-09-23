@@ -1,24 +1,28 @@
+import os
+from os.path import (exists, join, split, abspath)
+import tempfile
 from unittest import TestCase, skipIf, skipUnless
+
 import numpy as np
 from numpy.testing import (assert_raises, assert_equal, assert_almost_equal)
-from os.path import (exists, join, split, abspath)
-import os
+
 from .. import SKM_cluster as skm
-
-
-
 
 class Test_SKM_Cluster(TestCase):
 
     def setUp(self):
         """ create small example data """
+        # create tmpdir for files, so we can cleanup
+        self.tmpdir = tempfile.mkdtemp()
         prng = np.random.RandomState(42)
+        # pseudo random data set
         rand_dat = prng.random_sample((10,20))
         ids = ['B%03d'%x for x in range(len(rand_dat))]
         features = ['feature_%04d'%x for x in range(rand_dat.shape[1])]
         df = skm.pd.DataFrame(rand_dat, index = ids, columns=features)
         self.data = df
         self.homedir = os.environ['HOME']
+        # three group data
         data = np.zeros((60,100))
         data[:10] = .5
         data[10:10+20] = .2
@@ -32,6 +36,8 @@ class Test_SKM_Cluster(TestCase):
         self.clust_df = clust_df
         self.features = features
 
+    def tearDown(self):
+        os.removedirs(self.tmpdir)
 
     def test_run_command(self):
         return_code = skm.run_command('echo')
@@ -75,7 +81,8 @@ class Test_SKM_Cluster(TestCase):
         membership_data[membership_data == '0'] = 'neg'
         membership_data[membership_data == '1'] = 'pos'
         tight_subjects = skm.create_tightclust(membership_data)
-        assert_equal(tight_subjects.index.values, np.array([0,1,2,3,6,7,8,9]))
+        assert_equal(tight_subjects.index.values, 
+                np.array([0,1,2,3,6,7,8,9]))
 
     def test_skm_permute(self):
         tmp = self.data.values.copy()
@@ -139,6 +146,20 @@ class Test_SKM_Cluster(TestCase):
                 index = sample_data.columns)
         assert_raises(TypeError, skm.predict_clust, sample_data, cutoffs_df)
 
+    def test_run_clustering(self):
+        two_groups = self.data.copy()
+        # put features in groups (10,20)
+        # each is a group of 5, weight first 10 features
+        two_groups = (two_groups - .5) / 10.
+        two_groups.values[:5,:10] = two_groups.values[:5,:10] + .8
+        two_groups.values[5:,:10] = two_groups.values[5:,:10] - .8
+        infile = os.path.join(self.tmpdir, 'data.csv')
+        two_groups.to_csv(infile)
+        weights, clusters = skm.run_clustering(infile, 10, None, 'best')
+        mask = clusters == 'pos'
+        expected = np.array(5* [10] + 5 * [0])
+        assert_equal(mask.sum(axis=1).values, expected)
+        os.remove(infile) 
 
 if __name__ == '__main__':
     unittest.main()

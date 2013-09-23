@@ -230,8 +230,8 @@ def parse_pos_neg(data_by_group, clusters):
     
     dcol = data_by_group[0].columns[0]
     ccol = clusters.columns[0]
-    clust1mean = data_by_group[dcol].mean(axis=1)
-    clust2mean = data_by_group[dcol].mean(axis=1)
+    clust1mean = data_by_group[0].mean(axis=0)
+    clust2mean = data_by_group[1].mean(axis=0)
     if clust1mean.mean() > clust2mean.mean():
         pos_means = clust1mean
         neg_means = clust2mean
@@ -377,7 +377,8 @@ def run_clustering(infile, nperm, weightsum, bound):
         codes and additional columns should correspond to features
     nperm: int
         number of clustering resample runs
-    weightsum: float
+    weightsum: None or float
+        if None: uses elbow method to find optimal features
         percentage of total feature weights to use in calculating cutoffs
         Only features with the highest weights summing to this value will 
         be used.
@@ -418,8 +419,8 @@ def run_clustering(infile, nperm, weightsum, bound):
             km_weight, km_clust = skm_cluster(traindat, best_L1bound)
         samp_clust, sampcutoffs = calc_cutoffs(traindat, 
                                                km_weight, 
-                                               weightsum, 
-                                               km_clust)
+                                               km_clust,
+                                               weightsum)
         unsamp_clust = predict_clust(testdat, sampcutoffs)
         # Log weights and cluster membership of resample run
         weight_rslts[resamp_run] = km_weight[0]
@@ -474,9 +475,9 @@ def classify_subjects(infile, weightsum, weight_rslts, clust_rslts):
     weight_totals = weight_rslts.mean(axis=1)
     tight_subs = create_tightclust(clust_rslts)
     tight_clust, grpcutoffs = calc_cutoffs(dataframe.ix[tight_subs.index], 
-                                            pd.DataFrame(weight_totals), 
-                                            weightsum,
-                                            tight_subs)
+            pd.DataFrame(weight_totals), 
+            tight_subs,
+            weightsum)
     all_clust = predict_clust(dataframe, grpcutoffs) 
     grpcutoffs.name = 'Cutoff_Value'
     weight_totals.name = 'WeightMean'    
@@ -580,7 +581,7 @@ if __name__ == '__main__':
     parser.add_argument('-nperm', type=int, dest = 'nperm', default = 1000, 
             help = 'Number of re-sample permutations (default 1000)')
     parser.add_argument('-weightsum', type=float, dest = 'weightsum', 
-                        default = 1.0, 
+                        default = None, 
             help = """Only determine cutoffs for features with weights making 
             up the top percentile specified. Constrains the number 
             of features used for classification to those that were 
