@@ -12,8 +12,11 @@ class Test_SKM_Cluster(TestCase):
 
     def setUp(self):
         """ create small example data """
-        rand_dat = np.random.random((10,20))
-        df = skm.pd.DataFrame(rand_dat)
+        prng = np.random.RandomState(42)
+        rand_dat = prng.random_sample((10,20))
+        ids = ['B%03d'%x for x in range(len(rand_dat))]
+        features = ['feature_%04d'%x for x in range(rand_dat.shape[1])]
+        df = skm.pd.DataFrame(rand_dat, index = ids, columns=features)
         self.data = df
         self.homedir = os.environ['HOME']
         data = np.zeros((60,100))
@@ -124,8 +127,17 @@ class Test_SKM_Cluster(TestCase):
         vect = skm.make_vector(p0,px)
         assert_equal(vect, np.array([100,-2]))
 
-    def test_predict_clust(data, cutoffs):
-
+    def test_predict_clust(self):
+        sample_data = self.data
+        cutoffs = skm.pd.Series(20*[.95], index = sample_data.columns)
+        predicted = skm.predict_clust(sample_data, cutoffs)
+        expected = np.array(['pos', 'pos', 'pos', 'pos', 'neg', 'neg',
+            'pos', 'pos', 'neg', 'neg'], dtype=str)
+        assert_equal(predicted.values, expected)
+        # test error if DataFrame is sent
+        cutoffs_df = skm.pd.DataFrame(20*[.95], 
+                index = sample_data.columns)
+        assert_raises(TypeError, skm.predict_clust, sample_data, cutoffs_df)
 
 
 if __name__ == '__main__':

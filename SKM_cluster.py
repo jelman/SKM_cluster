@@ -313,7 +313,7 @@ def predict_clust(data, cutoffs):
         n by p dataframe where n is observations and p is features (i.e. ROIs)
         Should include subject codes as index and features as columns.
             
-    cutoffs:   pandas DataFrame   
+    cutoffs:   Series   
         index = features of interest labels, values = weights 
     
     Returns
@@ -322,9 +322,12 @@ def predict_clust(data, cutoffs):
         index = subject codes passed from input data
         values = predicted cluster membership     
     """
+    ## make sure cutoffs is a Series
+    if hasattr(cutoffs,'columns'):
+        raise TypeError('cutoffs should be Series not %s'%type(cutoffs))
     # Check all features against cut-offs
     cutdata = data[cutoffs.index] > cutoffs 
-    # Classify as pos if any feature is above cutoff
+    # Classify as pos if "any" feature is above cutoff
     cutdata_agg = cutdata.any(axis=1)
     predicted_clust = cutdata_agg.astype(str).replace(['T', 'F'], 
                                                       ['pos', 'neg'])
