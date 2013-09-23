@@ -220,6 +220,31 @@ def parse_clusters(clusters, data, top_features):
                 for c_index in cluster_indexes]
     return cluster_dats
 
+def parse_pos_neg(data_by_group, clusters):
+    """ takes two groups from data_by group, finds group with
+    higher mean value, creates new group classifying subjects
+    as 'pos' or 'neg'"""
+    ## NOTE cluster ids (1, 2) are arbitrary, not based on cluster mean
+    if not len(data_by_group) == 2:
+        raise ValueError('only expected two groups not %d'%len(data_by_group))
+    
+    dcol = data_by_group[0].columns[0]
+    ccol = clusters.columns[0]
+    clust1mean = data_by_group[dcol].mean(axis=1)
+    clust2mean = data_by_group[dcol].mean(axis=1)
+    if clust1mean.mean() > clust2mean.mean():
+        pos_means = clust1mean
+        neg_means = clust2mean
+        clust_renamed = clusters[ccol].astype(str).replace(['1','2'], 
+                                                          ['pos','neg'])
+    elif clust1mean.mean() < clust2mean.mean():
+        pos_means = clust2mean
+        neg_means = clust1mean
+        clust_renamed = clusters[ccol].astype(str).replace(['1','2'], 
+                                                         ['neg','pos'])
+    cutoffs = (pos_means + neg_means) / 2
+    clust_renamed.name = 'PIB_Status'
+    return clust_renamed, cutoffs
 
 def calc_cutoffs(data, weights, clusters, weightsum=None):
     """
@@ -272,19 +297,8 @@ def calc_cutoffs(data, weights, clusters, weightsum=None):
         sum_weights = sorted_weights.cumsum()
         top_features = sum_weights[sum_weights[0] <= weightsum].index
 
-    ## XXXX NOTE 1, 2 are arbitrary, not based on cluster mean
-    if clust1mean.mean() > clust2mean.mean():
-        pos_means = clust1mean
-        neg_means = clust2mean
-        clust_renamed = clusters[0].astype(str).replace(['1','2'], 
-                                                        ['pos','neg'])
-    elif clust1mean.mean() < clust2mean.mean():
-        pos_means = clust2mean
-        neg_means = clust1mean
-        clust_renamed = clusters[0].astype(str).replace(['1','2'], 
-                                                        ['neg','pos'])
-    cutoffs = (pos_means + neg_means) / 2
-    clust_renamed.name = 'PIB_Status'
+    data_by_group = parse_clusters(clusters, data, top_features)
+    clust_renamed, cutoffs = parse_pos_neg(data_by_group, clusters) 
     return clust_renamed, cutoffs
 
 

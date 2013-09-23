@@ -16,6 +16,19 @@ class Test_SKM_Cluster(TestCase):
         df = skm.pd.DataFrame(rand_dat)
         self.data = df
         self.homedir = os.environ['HOME']
+        data = np.zeros((60,100))
+        data[:10] = .5
+        data[10:10+20] = .2
+        data[30:] = .6
+        clust_dat = 10* [1] + 20 * [2] + 30 * [3]
+        ids = ['B%03d'%x for x in range(len(data))]
+        features = ['feature_%04d'%x for x in range(data.shape[1])]
+        data_df = skm.pd.DataFrame(data, index=ids, columns=features)
+        clust_df = skm.pd.DataFrame({'cluster':clust_dat}, index=ids)
+        self.data_df = data_df
+        self.clust_df = clust_df
+        self.features = features
+
 
     def test_run_command(self):
         return_code = skm.run_command('echo')
@@ -93,19 +106,17 @@ class Test_SKM_Cluster(TestCase):
 
 
     def test_parse_clusters(self):
-        data = np.zeros((60,100))
-        ids = ['B%03d'%x for x in range(len(data))]
-        features = ['feature_%04d'%x for x in range(data.shape[1])]
-        data_df = skm.pd.DataFrame(data, index=ids, columns=features)
         # define 3 groups
-        clust_dat = 10* [1] + 20 * [2] + 30 * [3]
-        clust_df = skm.pd.DataFrame({'cluster':clust_dat}, index=ids)
-        top_features = features[:10]
-        cluster_dats = skm.parse_clusters(clust_df, data_df, top_features)
+        top_features = self.features[:10]
+        cluster_dats = skm.parse_clusters(self.clust_df, self.data_df, 
+                top_features)
         assert_equal(cluster_dats[0].shape, (10,10))
         assert_equal(cluster_dats[1].shape, (20,10))
         assert_equal(cluster_dats[2].shape, (30,10))
 
+
+    def test_parse_pos_neg(self):
+        assert_raises(ValueError, skm.parse_pos_neg, [100,100,100], [1,2,3])
 
     def test_make_vector(self):
         p0 = [0, 2]
