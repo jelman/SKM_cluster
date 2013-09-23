@@ -124,6 +124,7 @@ class Test_SKM_Cluster(TestCase):
         vect = skm.make_vector(p0,px)
         assert_equal(vect, np.array([100,-2]))
 
+    def test_predict_clust(data, cutoffs):
 
 
 
