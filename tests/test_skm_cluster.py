@@ -6,7 +6,7 @@ from unittest import TestCase, skipIf, skipUnless
 import numpy as np
 from numpy.testing import (assert_raises, assert_equal, assert_almost_equal)
 
-from .. import SKM_cluster as skm
+from .. import skm_cluster as skm
 
 class Test_SKM_Cluster(TestCase):
 
