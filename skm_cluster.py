@@ -1,5 +1,6 @@
 import os, sys
 import argparse
+import readline
 
 import numpy as np
 import pandas as pd
